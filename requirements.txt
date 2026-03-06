@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+requests
+fastapi
+uvicorn
+pydantic
+tensorflow
+scikit-learn
+opencv-python-headless
