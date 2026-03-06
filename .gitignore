@@ -3,11 +3,10 @@ env/
 venv/
 .venv/
 
-data/raw/
-*.jpg
-*.jpeg
-*.png
-*.mp4
+
+data/raw/CNRPark-Patches-150x150
+
+data/raw/CNR-EXT-Patches-150x150
 
 .env
 secrets.toml
