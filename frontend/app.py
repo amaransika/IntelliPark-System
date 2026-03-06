@@ -9,7 +9,7 @@ import re
 import requests # Used to communicate with FastAPI
 
 # --- Configuration for FastAPI Endpoint ---
-API_URL = "http://127.0.0.1:8000/predict"
+API_URL = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000/predict")
 
 st.set_page_config(page_title="IntelliPark Master Dashboard", layout="wide")
 
