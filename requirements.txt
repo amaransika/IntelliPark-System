@@ -8,3 +8,5 @@ pydantic
 tensorflow-cpu
 scikit-learn
 opencv-python-headless
+easyocr
+ultralytics

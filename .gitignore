@@ -8,6 +8,14 @@ data/raw/CNRPark-Patches-150x150
 
 data/raw/CNR-EXT-Patches-150x150
 
+data/anpr/debug_plates
+data/anpr/sri_lanka_plates
+data/anpr/SriLankan_YOLO
+data/anpr/test
+data/anpr/manual_test_video_2.MOV
+data/anpr/manual_test_video.mp4
+data/anpr/manual_test_video_3.mp4
+
 .env
 secrets.toml
 
