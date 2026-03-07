@@ -14,6 +14,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
 
+# NEW: Import Supabase
+from supabase import create_client, Client
+
 # --- 1. Data Structures (CNN Parking) ---
 class Coordinate(BaseModel):
     x: int
@@ -40,6 +43,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+SUPABASE_URL = "https://jzxlafustfcreyxjulvq.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6eGxhZnVzdGZjcmV5eGp1bHZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NTkwMTYsImV4cCI6MjA4ODQzNTAxNn0.2iKD2qjXuQ8UxgU91C5S-La8TajF2_9sk7WROKAfWZo"
+
+# Initialize Supabase client (only if keys are provided)
+supabase: Client = None
+if "https://jzxlafustfcreyxjulvq.supabase.co" not in SUPABASE_URL:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("☁️ [INFO] Supabase Cloud Database Connected Successfully!")
+else:
+    print("⚠️ [WARNING] Supabase Keys not added. Cloud saving will be disabled.")
+
 
 # Global Variables (CNN)
 parking_model = None
@@ -109,7 +124,6 @@ async def delayed_ai_loader():
         print(f"❌ [ERROR] ANPR Pre-loading failed: {e}")
         ANPR_STATE["alert_message"] = "Error Pre-loading AI Models!"
 
-
 # --- 4. ANPR Core Logic ---
 def clean_and_format_plate(raw_text):
     clean_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper())
@@ -130,6 +144,23 @@ def clean_and_format_plate(raw_text):
         return f"{final_letters}-{numbers}"
     return None
 
+# --- NEW: Cloud DB Saver Helper Function ---
+def save_to_cloud_db(date_str, time_str, plate, status):
+    """Saves to Supabase Database securely without crashing the system"""
+    if supabase is None:
+        return
+    try:
+        data = {
+            "date": date_str,
+            "time": time_str,
+            "plate": plate,
+            "status": status
+        }
+        response = supabase.table('anpr_logs').insert(data).execute()
+        print(f"☁️ [CLOUD DB] Synced securely: {plate} at {time_str}")
+    except Exception as e:
+        print(f"❌ [CLOUD DB ERROR] Failed to sync {plate}: {e}")
+
 async def run_anpr_sentinel():
     global GLOBAL_ANPR_FRAME, ANPR_STATE, PLATE_HISTORY, ANPR_IS_RUNNING, yolo_model_global, reader_global
     
@@ -138,12 +169,10 @@ async def run_anpr_sentinel():
         ANPR_IS_RUNNING = False
         return
 
-    # Wait if models are still pre-loading in the background
     while yolo_model_global is None or reader_global is None:
         ANPR_STATE["alert_message"] = "AI Models still warming up, please wait..."
         await asyncio.sleep(1)
 
-    # Use the pre-loaded models (Zero loading time here!)
     yolo_model = yolo_model_global
     reader = reader_global
     
@@ -226,14 +255,22 @@ async def run_anpr_sentinel():
                     if best_plate_text not in recently_logged_plates or (curr_time - recently_logged_plates[best_plate_text] > 10):
                         is_flagged = best_plate_text in global_flagged_list
                         now = datetime.now()
+                        date_str = now.strftime("%Y-%m-%d")
+                        time_str = now.strftime("%H:%M:%S")
+                        status_str = "🚨 FLAGGED ALARM" if is_flagged else "✅ Authorized"
                         
+                        # 1. Save to Local CSV (Original Logic)
                         pd.DataFrame([{
-                            'Date': now.strftime("%Y-%m-%d"), 'Time': now.strftime("%H:%M:%S"),
-                            'Plate': best_plate_text, 'Status': "🚨 FLAGGED ALARM" if is_flagged else "✅ Authorized"
+                            'Date': date_str, 'Time': time_str,
+                            'Plate': best_plate_text, 'Status': status_str
                         }]).to_csv(LOG_CSV_PATH, mode='a', header=False, index=False)
                         
-                        PLATE_HISTORY.insert(0, {"plate": best_plate_text, "flagged": is_flagged, "time": now.strftime("%H:%M:%S")})
+                        # 2. Add to Frontend UI
+                        PLATE_HISTORY.insert(0, {"plate": best_plate_text, "flagged": is_flagged, "time": time_str})
                         if len(PLATE_HISTORY) > 6: PLATE_HISTORY.pop()
+                        
+                        # 3. Save to Real-World Cloud Database ASYNCHRONOUSLY (No Lag)
+                        asyncio.create_task(asyncio.to_thread(save_to_cloud_db, date_str, time_str, best_plate_text, status_str))
                         
                         recently_logged_plates[best_plate_text] = curr_time
 
