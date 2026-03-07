@@ -145,7 +145,7 @@ if times:
             
             # --- Communicate with FastAPI Backend ---
             try:
-                response = requests.post(API_URL, json=payload)
+                response = requests.post(API_URL, json=payload, timeout=120)
                 response.raise_for_status() # Check for HTTP errors
                 api_results = response.json()
                 

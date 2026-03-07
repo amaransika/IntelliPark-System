@@ -5,6 +5,6 @@ requests
 fastapi
 uvicorn
 pydantic
-tensorflow
+tensorflow-cpu
 scikit-learn
 opencv-python-headless

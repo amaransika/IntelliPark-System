@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from sklearn.preprocessing import LabelBinarizer
+from fastapi import Request
+
 
 # --- 1. Define Data Structures (Pydantic Models) ---
 class Coordinate(BaseModel):
@@ -103,4 +105,9 @@ def predict_occupancy(req: PredictionRequest):
 # --- 5. Health Check Endpoint ---
 @app.get("/")
 def read_root():
+    return {"status": "Active", "message": "IntelliPark API is running."}
+
+
+@app.api_route("/", methods=["GET", "HEAD"])
+def read_root(request: Request):
     return {"status": "Active", "message": "IntelliPark API is running."}
