@@ -49,7 +49,7 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 # Initialize Supabase client (only if keys are provided)
 supabase: Client = None
-if "https://jzxlafustfcreyxjulvq.supabase.co" not in SUPABASE_URL:
+if "YOUR_SUPABASE_URL_HERE" not in SUPABASE_URL:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     print("☁️ [INFO] Supabase Cloud Database Connected Successfully!")
 else:
