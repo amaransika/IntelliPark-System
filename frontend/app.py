@@ -61,10 +61,20 @@ st.markdown("""
 st.sidebar.title("🎮 Navigation")
 st.sidebar.markdown("---")
 st.sidebar.error("📢 **Security Alert System**")
+
+# THE BUTTON THAT TRIGGERS THE ANPR VIDEO
 if st.sidebar.button("🚨 VIEW LIVE ANPR ALERTS", use_container_width=True):
+    try:
+        # Tell Backend to start the Camera and Load AI
+        requests.get(f"{BACKEND_BASE}/api/anpr/start", timeout=2)
+    except:
+        pass 
     st.session_state.page = 'anpr'
+    st.rerun()
+
 if st.sidebar.button("🏠 BACK TO DASHBOARD", use_container_width=True):
     st.session_state.page = 'dashboard'
+    st.rerun()
 st.sidebar.markdown("---")
 
 
@@ -185,7 +195,7 @@ elif st.session_state.page == 'anpr':
         anpr_feed = api_data.get("feed", {})
         history = api_data.get("history", [])
     except:
-        anpr_feed = {"best_plate": "--", "confidence": 0.0, "is_flagged": False, "alert_message": "Connecting..."}
+        anpr_feed = {"best_plate": "--", "confidence": 0.0, "is_flagged": False, "alert_message": "Connecting to AI Server..."}
         history = []
 
     # 1. Massive Red Alert Banner (Shows only if flagged)
@@ -211,7 +221,7 @@ elif st.session_state.page == 'anpr':
         
         st.markdown(f"""
         <div style="background-color: #0f172a; padding: 20px; border-radius: 10px; border: 2px solid {plate_color}; text-align: center;">
-            <p style="color: #94a3b8; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">Target Plate Locked</p>
+            <p style="color: #94a3b8; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">System Status: <br><span style="color: #facc15;">{anpr_feed.get('alert_message', '')}</span></p>
             <h2 style="color: {plate_color}; font-family: monospace; font-size: 40px; margin: 10px 0;">{anpr_feed.get('best_plate', '--')}</h2>
             <p style="color: #cbd5e1; font-size: 14px;">OCR Confidence: <b>{(anpr_feed.get('confidence', 0)*100):.1f}%</b></p>
         </div>

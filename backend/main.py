@@ -4,9 +4,7 @@ import os
 import cv2
 import re
 import numpy as np
-import tensorflow as tf
 import asyncio
-import easyocr
 import pandas as pd
 import time
 from datetime import datetime
@@ -15,8 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
-from sklearn.preprocessing import LabelBinarizer
-from ultralytics import YOLO
 
 # --- 1. Data Structures (CNN Parking) ---
 class Coordinate(BaseModel):
@@ -61,28 +57,58 @@ ANPR_STATE = {
     "best_plate": "--",
     "confidence": 0.0,
     "is_flagged": False,
-    "alert_message": "Scanning Entrance..."
+    "alert_message": "System Initializing..."
 }
-PLATE_HISTORY = [] # To store recent scans for the UI
+PLATE_HISTORY = []
+ANPR_IS_RUNNING = False 
 
-# --- 3. Asset Loading ---
+# Pre-loaded Models
+yolo_model_global = None
+reader_global = None
+
+# --- 3. Asynchronous Delayed Pre-Loader (Super Fast Startup) ---
 @app.on_event("startup")
 async def startup_event():
-    global parking_model, lb
-    try:
-        # Load Parking CNN
-        model_path = os.path.join(base_dir, 'models', 'best_parking_model.keras')
-        parking_model = tf.keras.models.load_model(model_path)
-        
-        weather_classes = ['OVERCAST', 'RAINY', 'SUNNY']
-        lb = LabelBinarizer()
-        lb.fit(weather_classes)
-        print("✅ [INFO] Multi-Modal Parking CNN Loaded.")
+    asyncio.create_task(delayed_ai_loader())
 
-        # Start ANPR Engine
-        asyncio.create_task(run_anpr_sentinel())
+async def delayed_ai_loader():
+    global parking_model, lb, yolo_model_global, reader_global
+    
+    print("⏳ [INFO] Waiting 5 seconds for Uvicorn to bind to port...")
+    await asyncio.sleep(5)
+    
+    # 1. Load Parking CNN
+    try:
+        ANPR_STATE["alert_message"] = "Loading Parking CNN..."
+        print("⚙️ [INFO] Loading Parking CNN in background...")
+        def load_cnn():
+            import tensorflow as tf
+            from sklearn.preprocessing import LabelBinarizer
+            model_path = os.path.join(base_dir, 'models', 'best_parking_model.keras')
+            model = tf.keras.models.load_model(model_path)
+            lb_instance = LabelBinarizer()
+            lb_instance.fit(['OVERCAST', 'RAINY', 'SUNNY'])
+            return model, lb_instance
+        parking_model, lb = await asyncio.to_thread(load_cnn)
+        print("✅ [INFO] Multi-Modal Parking CNN Loaded.")
     except Exception as e:
-        print(f"❌ [ERROR] Startup failed: {e}")
+        print(f"❌ [ERROR] CNN Loading failed: {e}")
+
+    # 2. Pre-load YOLO & EasyOCR in background (Ready for button click)
+    try:
+        ANPR_STATE["alert_message"] = "Pre-loading ANPR AI Engines..."
+        print("⚙️ [INFO] Pre-loading YOLO & EasyOCR in background...")
+        def load_anpr():
+            from ultralytics import YOLO
+            import easyocr
+            return YOLO(YOLO_PATH), easyocr.Reader(['en'], gpu=False)
+        yolo_model_global, reader_global = await asyncio.to_thread(load_anpr)
+        print("✅ [INFO] ANPR Models Pre-loaded Successfully.")
+        ANPR_STATE["alert_message"] = "System Ready. Awaiting ANPR Activation..."
+    except Exception as e:
+        print(f"❌ [ERROR] ANPR Pre-loading failed: {e}")
+        ANPR_STATE["alert_message"] = "Error Pre-loading AI Models!"
+
 
 # --- 4. ANPR Core Logic ---
 def clean_and_format_plate(raw_text):
@@ -105,14 +131,23 @@ def clean_and_format_plate(raw_text):
     return None
 
 async def run_anpr_sentinel():
-    global GLOBAL_ANPR_FRAME, ANPR_STATE, PLATE_HISTORY
+    global GLOBAL_ANPR_FRAME, ANPR_STATE, PLATE_HISTORY, ANPR_IS_RUNNING, yolo_model_global, reader_global
     
     if not os.path.exists(YOLO_PATH):
-        print(f"❌ Error: YOLO model not found at {YOLO_PATH}")
+        ANPR_STATE["alert_message"] = "Error: YOLO Model Not Found!"
+        ANPR_IS_RUNNING = False
         return
 
-    yolo_model = YOLO(YOLO_PATH)
-    reader = easyocr.Reader(['en'], gpu=False) 
+    # Wait if models are still pre-loading in the background
+    while yolo_model_global is None or reader_global is None:
+        ANPR_STATE["alert_message"] = "AI Models still warming up, please wait..."
+        await asyncio.sleep(1)
+
+    # Use the pre-loaded models (Zero loading time here!)
+    yolo_model = yolo_model_global
+    reader = reader_global
+    
+    ANPR_STATE["alert_message"] = "Scanning Entrance..."
     
     if not os.path.exists(FLAGGED_CSV_PATH): pd.DataFrame(columns=['plate']).to_csv(FLAGGED_CSV_PATH, index=False)
     if not os.path.exists(LOG_CSV_PATH): pd.DataFrame(columns=['Date', 'Time', 'Plate', 'Status']).to_csv(LOG_CSV_PATH, index=False)
@@ -121,13 +156,12 @@ async def run_anpr_sentinel():
     global_flagged_list = [str(p).strip().upper() for p in flagged_df['plate'].tolist()]
 
     cap = cv2.VideoCapture(ANPR_VIDEO_PATH)
-    frame_count = 0
-    active_session, best_plate_text, best_plate_conf = False, None, 0.0
+    frame_count, active_session, best_plate_text, best_plate_conf = 0, False, None, 0.0
     frames_without_detection, SESSION_TIMEOUT = 0, 10 
     recently_logged_plates = {}
     is_currently_flagged = False 
 
-    while True:
+    while ANPR_IS_RUNNING:
         ret, frame = cap.read()
         if not ret:
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -193,13 +227,11 @@ async def run_anpr_sentinel():
                         is_flagged = best_plate_text in global_flagged_list
                         now = datetime.now()
                         
-                        # Save to CSV
                         pd.DataFrame([{
                             'Date': now.strftime("%Y-%m-%d"), 'Time': now.strftime("%H:%M:%S"),
                             'Plate': best_plate_text, 'Status': "🚨 FLAGGED ALARM" if is_flagged else "✅ Authorized"
                         }]).to_csv(LOG_CSV_PATH, mode='a', header=False, index=False)
                         
-                        # Update History Array for Frontend
                         PLATE_HISTORY.insert(0, {"plate": best_plate_text, "flagged": is_flagged, "time": now.strftime("%H:%M:%S")})
                         if len(PLATE_HISTORY) > 6: PLATE_HISTORY.pop()
                         
@@ -212,9 +244,21 @@ async def run_anpr_sentinel():
         await asyncio.sleep(0.01)
 
 # --- 5. API Endpoints ---
+@app.get("/api/anpr/start")
+async def start_anpr_engine():
+    global ANPR_IS_RUNNING, ANPR_STATE
+    if not ANPR_IS_RUNNING:
+        ANPR_IS_RUNNING = True
+        ANPR_STATE["alert_message"] = "Connecting Camera..."
+        asyncio.create_task(run_anpr_sentinel())
+        return {"status": "ANPR Engine Started successfully"}
+    return {"status": "ANPR Engine is already running"}
+
 @app.post("/predict", response_model=List[PredictionResponse])
 def predict_occupancy(req: PredictionRequest):
-    """CNN Parking Prediction Logic"""
+    if parking_model is None:
+        raise HTTPException(status_code=503, detail="Model is still loading. Please wait.")
+        
     full_img_path = os.path.join(base_dir, req.image_path)
     img = cv2.imread(full_img_path)
     if img is None: raise HTTPException(status_code=404, detail="Image not found")
@@ -225,8 +269,7 @@ def predict_occupancy(req: PredictionRequest):
     
     patches = []
     for coord in req.coordinates:
-        x1, y1 = max(0, coord.x), max(0, coord.y)
-        x2, y2 = min(w, coord.x + coord.w), min(h, coord.y + coord.h)
+        x1, y1, x2, y2 = max(0, coord.x), max(0, coord.y), min(w, coord.x + coord.w), min(h, coord.y + coord.h)
         patch = img[y1:y2, x1:x2]
         patch = cv2.resize(cv2.cvtColor(patch, cv2.COLOR_BGR2RGB), (150, 150)) if patch.size > 0 else np.zeros((150, 150, 3))
         patches.append(patch / 255.0)
@@ -240,6 +283,12 @@ async def anpr_video_feed():
         while True:
             if GLOBAL_ANPR_FRAME is not None:
                 ret, buffer = cv2.imencode('.jpg', GLOBAL_ANPR_FRAME)
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            else:
+                blank = np.zeros((480, 640, 3), np.uint8)
+                msg = ANPR_STATE.get("alert_message", "Standby...")
+                cv2.putText(blank, msg, (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                ret, buffer = cv2.imencode('.jpg', blank)
                 yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
             await asyncio.sleep(0.05)
     return StreamingResponse(stream_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
