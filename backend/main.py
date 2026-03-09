@@ -1,5 +1,3 @@
-# backend/main.py
-
 import os
 import cv2
 import re
@@ -13,11 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
+from contextlib import asynccontextmanager
 
-# NEW: Import Supabase
 from supabase import create_client, Client
 
-# --- 1. Data Structures (CNN Parking) ---
 class Coordinate(BaseModel):
     x: int
     y: int
@@ -33,7 +30,6 @@ class PredictionResponse(BaseModel):
     is_busy: bool
     confidence: float
 
-# --- 2. Initialize FastAPI ---
 app = FastAPI(title="IntelliPark Master AI Engine")
 
 app.add_middleware(
@@ -47,20 +43,17 @@ app.add_middleware(
 SUPABASE_URL = "https://jzxlafustfcreyxjulvq.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6eGxhZnVzdGZjcmV5eGp1bHZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NTkwMTYsImV4cCI6MjA4ODQzNTAxNn0.2iKD2qjXuQ8UxgU91C5S-La8TajF2_9sk7WROKAfWZo"
 
-# Initialize Supabase client (only if keys are provided)
 supabase: Client = None
 if "YOUR_SUPABASE_URL_HERE" not in SUPABASE_URL:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("☁️ [INFO] Supabase Cloud Database Connected Successfully!")
+    print("[INFO] Supabase Cloud Database Connected Successfully!")
 else:
-    print("⚠️ [WARNING] Supabase Keys not added. Cloud saving will be disabled.")
+    print("[WARNING] Supabase Keys not added. Cloud saving will be disabled.")
 
 
-# Global Variables (CNN)
 parking_model = None
 lb = None
 
-# Global Variables (ANPR)
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ANPR_VIDEO_PATH = os.path.join(base_dir, 'data', 'anpr', 'manual_test_video_4.mp4')
 FLAGGED_CSV_PATH = os.path.join(base_dir, 'data', 'anpr', 'flagged_vehicles.csv')
@@ -77,25 +70,25 @@ ANPR_STATE = {
 PLATE_HISTORY = []
 ANPR_IS_RUNNING = False 
 
-# Pre-loaded Models
 yolo_model_global = None
 reader_global = None
 
-# --- 3. Asynchronous Delayed Pre-Loader (Super Fast Startup) ---
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     asyncio.create_task(delayed_ai_loader())
+    yield
+
+app.router.lifespan_context = lifespan
 
 async def delayed_ai_loader():
     global parking_model, lb, yolo_model_global, reader_global
     
-    print("⏳ [INFO] Waiting 5 seconds for Uvicorn to bind to port...")
+    print("[INFO] Waiting 5 seconds for Uvicorn to bind to port...")
     await asyncio.sleep(5)
     
-    # 1. Load Parking CNN
     try:
         ANPR_STATE["alert_message"] = "Loading Parking CNN..."
-        print("⚙️ [INFO] Loading Parking CNN in background...")
+        print("[INFO] Loading Parking CNN in background...")
         def load_cnn():
             import tensorflow as tf
             from sklearn.preprocessing import LabelBinarizer
@@ -105,26 +98,24 @@ async def delayed_ai_loader():
             lb_instance.fit(['OVERCAST', 'RAINY', 'SUNNY'])
             return model, lb_instance
         parking_model, lb = await asyncio.to_thread(load_cnn)
-        print("✅ [INFO] Multi-Modal Parking CNN Loaded.")
+        print("[INFO] Multi-Modal Parking CNN Loaded.")
     except Exception as e:
-        print(f"❌ [ERROR] CNN Loading failed: {e}")
+        print(f"[ERROR] CNN Loading failed: {e}")
 
-    # 2. Pre-load YOLO & EasyOCR in background (Ready for button click)
     try:
         ANPR_STATE["alert_message"] = "Pre-loading ANPR AI Engines..."
-        print("⚙️ [INFO] Pre-loading YOLO & EasyOCR in background...")
+        print("[INFO] Pre-loading YOLO & EasyOCR in background...")
         def load_anpr():
             from ultralytics import YOLO
             import easyocr
             return YOLO(YOLO_PATH), easyocr.Reader(['en'], gpu=False)
         yolo_model_global, reader_global = await asyncio.to_thread(load_anpr)
-        print("✅ [INFO] ANPR Models Pre-loaded Successfully.")
+        print("[INFO] ANPR Models Pre-loaded Successfully.")
         ANPR_STATE["alert_message"] = "System Ready. Awaiting ANPR Activation..."
     except Exception as e:
-        print(f"❌ [ERROR] ANPR Pre-loading failed: {e}")
+        print(f"[ERROR] ANPR Pre-loading failed: {e}")
         ANPR_STATE["alert_message"] = "Error Pre-loading AI Models!"
 
-# --- 4. ANPR Core Logic ---
 def clean_and_format_plate(raw_text):
     clean_text = re.sub(r'[^A-Z0-9]', '', raw_text.upper())
     if len(clean_text) >= 6:
@@ -144,7 +135,6 @@ def clean_and_format_plate(raw_text):
         return f"{final_letters}-{numbers}"
     return None
 
-# --- NEW: Cloud DB Saver Helper Function ---
 def save_to_cloud_db(date_str, time_str, plate, status):
     """Saves to Supabase Database securely without crashing the system"""
     if supabase is None:
@@ -232,7 +222,7 @@ async def run_anpr_sentinel():
                                 "best_plate": best_plate_text,
                                 "confidence": round(best_plate_conf, 2),
                                 "is_flagged": is_currently_flagged,
-                                "alert_message": f"🚨 ALERT: {best_plate_text}" if is_currently_flagged else f"✅ Scanning: {best_plate_text}"
+                                "alert_message": f"ALERT: {best_plate_text}" if is_currently_flagged else f"✅ Scanning: {best_plate_text}"
                             })
 
                     if best_plate_text:
@@ -257,19 +247,16 @@ async def run_anpr_sentinel():
                         now = datetime.now()
                         date_str = now.strftime("%Y-%m-%d")
                         time_str = now.strftime("%H:%M:%S")
-                        status_str = "🚨 FLAGGED ALARM" if is_flagged else "✅ Authorized"
+                        status_str = "FLAGGED ALARM" if is_flagged else "Authorized"
                         
-                        # 1. Save to Local CSV (Original Logic)
                         pd.DataFrame([{
                             'Date': date_str, 'Time': time_str,
                             'Plate': best_plate_text, 'Status': status_str
                         }]).to_csv(LOG_CSV_PATH, mode='a', header=False, index=False)
                         
-                        # 2. Add to Frontend UI
                         PLATE_HISTORY.insert(0, {"plate": best_plate_text, "flagged": is_flagged, "time": time_str})
                         if len(PLATE_HISTORY) > 6: PLATE_HISTORY.pop()
                         
-                        # 3. Save to Real-World Cloud Database ASYNCHRONOUSLY (No Lag)
                         asyncio.create_task(asyncio.to_thread(save_to_cloud_db, date_str, time_str, best_plate_text, status_str))
                         
                         recently_logged_plates[best_plate_text] = curr_time
@@ -280,7 +267,6 @@ async def run_anpr_sentinel():
         GLOBAL_ANPR_FRAME = frame.copy()
         await asyncio.sleep(0.01)
 
-# --- 5. API Endpoints ---
 @app.get("/api/anpr/start")
 async def start_anpr_engine():
     global ANPR_IS_RUNNING, ANPR_STATE

@@ -1,5 +1,3 @@
-# frontend/app.py
-
 import os
 import streamlit as st
 import pandas as pd
@@ -9,19 +7,16 @@ import re
 import requests
 from streamlit_autorefresh import st_autorefresh
 
-# --- 1. Page Configuration & Navigation Logic ---
-st.set_page_config(page_title="IntelliPark Master Dashboard", layout="wide", page_icon="🚗")
+st.set_page_config(page_title="IntelliPark Master Dashboard", layout="wide")
 
 if 'page' not in st.session_state:
     st.session_state.page = 'dashboard'
 
-# Auto refresh only on the ANPR page (every 1 second)
 if st.session_state.page == 'anpr':
     st_autorefresh(interval=1000, limit=None, key="anpr_refresh")
 
 BACKEND_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000").replace("/predict", "")
 
-# --- 2. Custom CSS Styles ---
 st.markdown("""
     <style>
     .main { background-color: #0f172a; color: #f1f5f9; } /* Dark slate background like React */
@@ -57,32 +52,27 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. Sidebar Navigation & Alerts ---
-st.sidebar.title("🎮 Navigation")
+st.sidebar.title("Navigation")
 st.sidebar.markdown("---")
-st.sidebar.error("📢 **Security Alert System**")
+st.sidebar.error("**Security Alert System**")
 
-# THE BUTTON THAT TRIGGERS THE ANPR VIDEO
-if st.sidebar.button("🚨 VIEW LIVE ANPR ALERTS", use_container_width=True):
+if st.sidebar.button("VIEW LIVE ANPR ALERTS", use_container_width=True):
     try:
-        # Tell Backend to start the Camera and Load AI
         requests.get(f"{BACKEND_BASE}/api/anpr/start", timeout=2)
     except:
         pass 
     st.session_state.page = 'anpr'
     st.rerun()
 
-if st.sidebar.button("🏠 BACK TO DASHBOARD", use_container_width=True):
+if st.sidebar.button("BACK TO DASHBOARD", use_container_width=True):
     st.session_state.page = 'dashboard'
     st.rerun()
 st.sidebar.markdown("---")
 
 
-# =========================================================
-# 4. PARKING DASHBOARD LOGIC (Original Intact)
-# =========================================================
+
 if st.session_state.page == 'dashboard':
-    st.title("🚗 IntelliPark: Multi-Modal Context-Aware System")
+    st.title("IntelliPark: Multi-Modal Context-Aware System")
     st.markdown("##### Research Focus: Counterfactual Reasoning in Feature Fusion CNN")
     st.divider()
 
@@ -184,12 +174,9 @@ if st.session_state.page == 'dashboard':
     else: st.error("Sequence data missing.")
 
 
-# =========================================================
-# 5. ANPR PAGE LOGIC (React-Style UI in Streamlit)
-# =========================================================
+
 elif st.session_state.page == 'anpr':
     
-    # Fetch data from API
     try:
         api_data = requests.get(f"{BACKEND_BASE}/api/anpr/status", timeout=2).json()
         anpr_feed = api_data.get("feed", {})
@@ -198,25 +185,22 @@ elif st.session_state.page == 'anpr':
         anpr_feed = {"best_plate": "--", "confidence": 0.0, "is_flagged": False, "alert_message": "Connecting to AI Server..."}
         history = []
 
-    # 1. Massive Red Alert Banner (Shows only if flagged)
+
     if anpr_feed.get("is_flagged", False):
-        st.markdown('<div class="red-banner">🚨 SECURITY ALERT: BLACKLISTED VEHICLE DETECTED 🚨</div>', unsafe_allow_html=True)
+        st.markdown('<div class="red-banner"> SECURITY ALERT: BLACKLISTED VEHICLE DETECTED </div>', unsafe_allow_html=True)
     
-    st.markdown('<h1 style="color: #60a5fa;">🛡️ ANPR Gateway Sentinel</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 style="color: #60a5fa;">ANPR Gateway Sentinel</h1>', unsafe_allow_html=True)
     st.markdown("<p style='color: #94a3b8;'>Live Optical Character Recognition & DB Matching</p>", unsafe_allow_html=True)
     st.divider()
 
     col_vid, col_data = st.columns([2.5, 1])
     
-    # 2. Live Video Feed
+
     with col_vid:
         st.markdown("<h4 style='color: #e2e8f0;'>🎥 Live Entrance Feed</h4>", unsafe_allow_html=True)
-        # We display the raw streaming endpoint URL as an image
         st.image(f"{BACKEND_BASE}/api/anpr/video_feed", use_container_width=True)
 
-    # 3. Info and History Panel
     with col_data:
-        # Status Box
         plate_color = "#ef4444" if anpr_feed.get("is_flagged", False) else "#34d399" if anpr_feed.get("best_plate") != "--" else "#475569"
         
         st.markdown(f"""
@@ -229,7 +213,6 @@ elif st.session_state.page == 'anpr':
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Recent Scans History
         st.markdown("<h4 style='color: #e2e8f0; border-bottom: 1px solid #334155; padding-bottom: 10px;'>📋 Recent Scans</h4>", unsafe_allow_html=True)
         
         if len(history) == 0:
