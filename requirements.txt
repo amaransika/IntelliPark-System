@@ -11,3 +11,4 @@ opencv-python
 ultralytics
 easyocr
 streamlit-autorefresh
+supabase
