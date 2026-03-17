@@ -2,13 +2,5 @@ streamlit
 pandas
 numpy
 requests
-fastapi
-uvicorn
-pydantic
-tensorflow-cpu
-scikit-learn
-opencv-python
-ultralytics
-easyocr
+opencv-python-headless
 streamlit-autorefresh
-supabase
