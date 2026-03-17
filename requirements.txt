@@ -1,6 +1,12 @@
-streamlit
+fastapi
+uvicorn
+pydantic
+tensorflow-cpu
+scikit-learn
+opencv-python-headless
+ultralytics
+easyocr
 pandas
 numpy
 requests
-opencv-python-headless
-streamlit-autorefresh
+supabase
