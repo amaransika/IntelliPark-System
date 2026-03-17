@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+tensorflow-cpu
+scikit-learn
+opencv-python-headless
+ultralytics
+easyocr
+pandas
+numpy
+requests
+supabase
