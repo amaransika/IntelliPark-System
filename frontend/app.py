@@ -14,8 +14,8 @@ if 'page' not in st.session_state:
 
 if st.session_state.page == 'anpr':
     st_autorefresh(interval=1000, limit=None, key="anpr_refresh")
-
-BACKEND_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000").replace("/predict", "")
+BACKEND_BASE = os.getenv("BACKEND_API_URL", "https://intellipark-ai-engine.onrender.com").replace("/predict", "")
+# BACKEND_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000").replace("/predict", "")
 
 st.markdown("""
     <style>
