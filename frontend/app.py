@@ -14,8 +14,9 @@ if 'page' not in st.session_state:
 
 if st.session_state.page == 'anpr':
     st_autorefresh(interval=1000, limit=None, key="anpr_refresh")
-BACKEND_BASE = os.getenv("BACKEND_API_URL", "https://intellipark-ai-engine.onrender.com").replace("/predict", "")
-# BACKEND_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000").replace("/predict", "")
+# BACKEND_BASE = os.getenv("BACKEND_API_URL", "https://intellipark-ai-engine.onrender.com").replace("/predict", "")
+# BACKEND_BASE = os.getenv("BACKEND_API_URL", "https://amaransika-intellipark-backend.hf.space").replace("/predict", "")
+BACKEND_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000").replace("/predict", "")
 
 st.markdown("""
     <style>
@@ -197,7 +198,7 @@ elif st.session_state.page == 'anpr':
     
 
     with col_vid:
-        st.markdown("<h4 style='color: #e2e8f0;'>🎥 Live Entrance Feed</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #e2e8f0;'>Live Entrance Feed</h4>", unsafe_allow_html=True)
         st.image(f"{BACKEND_BASE}/api/anpr/video_feed", use_container_width=True)
 
     with col_data:
@@ -220,6 +221,6 @@ elif st.session_state.page == 'anpr':
         else:
             for log in history:
                 if log['flagged']:
-                    st.markdown(f"<div class='log-entry-alert'>🚨 {log['plate']} <span style='float:right; color:#9ca3af; font-size:12px;'>{log['time']}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='log-entry-alert'>{log['plate']} <span style='float:right; color:#9ca3af; font-size:12px;'>{log['time']}</span></div>", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"<div class='log-entry-safe'>✅ {log['plate']} <span style='float:right; color:#64748b; font-size:12px;'>{log['time']}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='log-entry-safe'>{log['plate']} <span style='float:right; color:#64748b; font-size:12px;'>{log['time']}</span></div>", unsafe_allow_html=True)

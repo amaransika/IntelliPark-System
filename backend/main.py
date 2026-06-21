@@ -44,7 +44,7 @@ SUPABASE_URL = "https://jzxlafustfcreyxjulvq.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6eGxhZnVzdGZjcmV5eGp1bHZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NTkwMTYsImV4cCI6MjA4ODQzNTAxNn0.2iKD2qjXuQ8UxgU91C5S-La8TajF2_9sk7WROKAfWZo"
 
 supabase: Client = None
-if "YOUR_SUPABASE_URL_HERE" not in SUPABASE_URL:
+if "SUPABASE_URL_HERE" not in SUPABASE_URL:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     print("[INFO] Supabase Cloud Database Connected Successfully!")
 else:
@@ -147,9 +147,9 @@ def save_to_cloud_db(date_str, time_str, plate, status):
             "status": status
         }
         response = supabase.table('anpr_logs').insert(data).execute()
-        print(f"☁️ [CLOUD DB] Synced securely: {plate} at {time_str}")
+        print(f"[CLOUD DB] Synced securely: {plate} at {time_str}")
     except Exception as e:
-        print(f"❌ [CLOUD DB ERROR] Failed to sync {plate}: {e}")
+        print(f"[CLOUD DB ERROR] Failed to sync {plate}: {e}")
 
 async def run_anpr_sentinel():
     global GLOBAL_ANPR_FRAME, ANPR_STATE, PLATE_HISTORY, ANPR_IS_RUNNING, yolo_model_global, reader_global
@@ -222,7 +222,7 @@ async def run_anpr_sentinel():
                                 "best_plate": best_plate_text,
                                 "confidence": round(best_plate_conf, 2),
                                 "is_flagged": is_currently_flagged,
-                                "alert_message": f"ALERT: {best_plate_text}" if is_currently_flagged else f"✅ Scanning: {best_plate_text}"
+                                "alert_message": f"ALERT: {best_plate_text}" if is_currently_flagged else f" Scanning: {best_plate_text}"
                             })
 
                     if best_plate_text:

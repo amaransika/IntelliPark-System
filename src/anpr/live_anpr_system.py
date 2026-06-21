@@ -10,10 +10,10 @@ import time
 
 VIDEO_SOURCE = '../../data/anpr/manual_test_video_4.mp4' 
 
-print("🚀 Loading YOLOv8 Plate Detector...")
+print("Loading YOLOv8 Plate Detector...")
 yolo_model = YOLO('../../models/anpr/best_yolo_plate.pt')
 
-print("👁️ Loading EasyOCR Engine...")
+print("Loading EasyOCR Engine...")
 reader = easyocr.Reader(['en'], gpu=True) 
 
 FLAGGED_CSV_PATH = '../../data/anpr/flagged_vehicles.csv'
@@ -115,7 +115,7 @@ def log_plate(plate_text):
             return 
             
     is_flagged = plate_text in GLOBAL_FLAGGED_LIST
-    status = "🚨 FLAGGED ALARM" if is_flagged else "✅ Authorized"
+    status = "FLAGGED ALARM" if is_flagged else "Authorized"
     now = datetime.now()
     
     pd.DataFrame([{
@@ -128,9 +128,9 @@ def log_plate(plate_text):
     recently_logged_plates[plate_text] = current_time
     print("-" * 50)
     if is_flagged:
-        print(f"🚨 SECURITY ALERT: Flagged vehicle {plate_text} detected at {now.strftime('%H:%M:%S')}!")
+        print(f"SECURITY ALERT: Flagged vehicle {plate_text} detected at {now.strftime('%H:%M:%S')}!")
     else:
-        print(f"✅ LOGGED: {plate_text} granted entry.")
+        print(f"LOGGED: {plate_text} granted entry.")
     print("-" * 50)
 
 
@@ -143,7 +143,7 @@ best_plate_conf = 0.0
 frames_without_detection = 0
 SESSION_TIMEOUT = 10 
 
-print("\n🎥 ANPR System Live. Waiting for vehicles...\n")
+print("\n ANPR System Live. Waiting for vehicles...\n")
 
 while cap.isOpened():
     ret, frame = cap.read()
